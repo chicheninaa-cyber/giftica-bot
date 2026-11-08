@@ -2,7 +2,7 @@
 Запускается GitHub Actions каждые 5 минут. Токен берётся из секрета PROM_TOKEN.
 Первый запуск (нет done_ids.json) только запоминает текущие заказы и никому не пишет.
 """
-import json, os, sys, urllib.request, urllib.parse, uuid
+import json, os, sys, urllib.request, urllib.parse
 from datetime import datetime, timedelta, timezone
 
 TOKEN = os.environ["PROM_TOKEN"]
@@ -45,13 +45,10 @@ def fetch_orders(since):
 
 
 def send(order_id):
-    b = uuid.uuid4().hex
-    parts = [("order_id", str(order_id)), ("body", MESSAGE)]
-    data = "".join(
-        f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n' for k, v in parts
-    ) + f"--{b}--\r\n"
+    # Prom принимает этот метод только в JSON (multipart отдаёт 400, проверено 08.11.2026)
+    data = json.dumps({"order_id": order_id, "body": MESSAGE}, ensure_ascii=False)
     code, body = req("POST", "/chat/send_order_context", data.encode("utf-8"),
-                     f"multipart/form-data; boundary={b}")
+                     "application/json")
     ok = code == 200
     try:
         ok = ok and json.loads(body).get("status") != "error"
